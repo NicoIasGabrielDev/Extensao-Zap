@@ -1,23 +1,20 @@
 {
   "manifest_version": 3,
-  "name": "Zap Extension 1",
-  "version": "1.10",
-  "description": "Extension to automate messages and audios on WhatsApp Web",
+  "name": "Zap Extension",
+  "version": "1.35",
+  "description": "Extension to automate messages on WhatsApp Web",
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": ["https://web.whatsapp.com/*"],
-  "action": {
-    "default_popup": "popup.html",
-    "default_icon": {
-      "16": "icons/icon16.png",
-      "48": "icons/icon48.png",
-      "128": "icons/icon128.png"
-    }
-  },
   "content_scripts": [
-  {
-    "matches": ["https://web.whatsapp.com/*"],
-    "js": ["content.js"],
-    "run_at": "document_idle"
+    {
+      "matches": ["https://web.whatsapp.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
   }
-  ]
 }
