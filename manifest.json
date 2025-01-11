@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Zap Extension",
-  "version": "1.35",
+  "version": "1.40",
   "description": "Extension to automate messages on WhatsApp Web",
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": ["https://web.whatsapp.com/*"],

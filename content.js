@@ -134,6 +134,65 @@ function createFloatingUI() {
 
     // Adicionar a interface ao body
     document.body.appendChild(container);
+
+    // Input para upload de áudio
+    const audioUpload = document.createElement("input");
+    audioUpload.type = "file";
+    audioUpload.accept = "audio/*";
+    audioUpload.style.marginBottom = "10px";
+    audioUpload.style.width = "100%";
+
+    audioUpload.addEventListener("change", async (event) => {
+        const file = event.target.files[0];
+        if (!file) {
+            alert("Selecione um arquivo de áudio!");
+            return;
+        }
+
+        try {
+            const formData = new FormData();
+            formData.append("audio", file);
+
+            const response = await fetch("http://localhost:3000/audios", {
+                method: "POST",
+                body: formData,
+            });
+
+            if (!response.ok) throw new Error("Erro ao fazer upload do áudio.");
+
+            alert("Áudio salvo com sucesso!");
+            loadAudios(); // Atualizar lista de áudios
+        } catch (error) {
+            console.error("Erro ao salvar áudio:", error);
+            alert("Erro ao salvar áudio. Verifique o console.");
+        }
+    });
+
+    container.appendChild(audioUpload);
+    // Botão para carregar áudios salvos
+    const loadAudiosButton = document.createElement("button");
+    loadAudiosButton.innerText = "Carregar Áudios Salvos";
+    loadAudiosButton.style.width = "100%";
+    loadAudiosButton.style.marginBottom = "10px";
+    loadAudiosButton.style.padding = "10px";
+    loadAudiosButton.style.border = "none";
+    loadAudiosButton.style.backgroundColor = "#007bff";
+    loadAudiosButton.style.color = "#fff";
+    loadAudiosButton.style.borderRadius = "5px";
+    loadAudiosButton.style.cursor = "pointer";
+
+    loadAudiosButton.addEventListener("click", loadAudios);
+    container.appendChild(loadAudiosButton);
+
+    // Lista de áudios salvos
+    const audioList = document.createElement("ul");
+    audioList.id = "audio-list";
+    audioList.style.listStyle = "none";
+    audioList.style.padding = "0";
+    audioList.style.margin = "10px 0";
+
+    container.appendChild(audioList);
+
 }
 
 // Função para enviar a mensagem no WhatsApp Web
@@ -171,6 +230,70 @@ async function sendMessageOnWhatsApp(text) {
             reject(error);
         }
     });
+}
+
+// Função para carregar áudios do backend
+async function loadAudios() {
+    try {
+        const response = await fetch("http://localhost:3000/audios");
+        if (!response.ok) throw new Error("Erro ao carregar áudios.");
+
+        const audios = await response.json();
+        const audioList = document.getElementById("audio-list");
+        audioList.innerHTML = ""; // Limpar lista existente
+
+        audios.forEach((audio) => {
+            const listItem = document.createElement("li");
+            listItem.style.marginBottom = "10px";
+
+            // Player de áudio
+            const audioPlayer = document.createElement("audio");
+            audioPlayer.controls = true;
+
+            // Carregar o arquivo como Blob
+            fetch(audio.url)
+                .then(response => {
+                    if (!response.ok) throw new Error("Erro ao carregar o áudio.");
+                    return response.blob();
+                })
+                .then(blob => {
+                    const blobUrl = URL.createObjectURL(blob);
+                    audioPlayer.src = blobUrl;
+                })
+                .catch(error => {
+                    console.error("Erro ao carregar o áudio:", error);
+                    alert("Erro ao carregar o áudio.");
+                });
+
+            // Botão para enviar áudio
+            const sendAudioButton = document.createElement("button");
+            sendAudioButton.innerText = "Enviar Áudio";
+            sendAudioButton.style.padding = "5px";
+            sendAudioButton.style.border = "none";
+            sendAudioButton.style.backgroundColor = "#25d366";
+            sendAudioButton.style.color = "#fff";
+            sendAudioButton.style.borderRadius = "5px";
+            sendAudioButton.style.cursor = "pointer";
+
+            sendAudioButton.addEventListener("click", () => {
+                sendAudioOnWhatsApp(audio.url);
+            });
+
+            listItem.appendChild(audioPlayer);
+            listItem.appendChild(sendAudioButton);
+            audioList.appendChild(listItem);
+        });
+    } catch (error) {
+        console.error("Erro ao carregar áudios:", error);
+        alert("Erro ao carregar áudios. Verifique o console.");
+    }
+}
+
+
+// Função para enviar áudio no WhatsApp Web
+function sendAudioOnWhatsApp(audioUrl) {
+    alert(`Envio de áudio não implementado. URL: ${audioUrl}`);
+    // Aqui você pode implementar lógica futura para enviar áudios diretamente.
 }
 
 // Garantir que a interface flutuante esteja sempre carregada
