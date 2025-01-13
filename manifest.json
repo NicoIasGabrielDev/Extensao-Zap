@@ -1,15 +1,27 @@
 {
   "manifest_version": 3,
   "name": "Zap Extension",
-  "version": "1.40",
+  "version": "1.44",
   "description": "Extension to automate messages on WhatsApp Web",
   "permissions": ["storage", "scripting", "activeTab"],
   "host_permissions": ["https://web.whatsapp.com/*"],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self'; object-src 'self'"
+  },
   "content_scripts": [
     {
       "matches": ["https://web.whatsapp.com/*"],
       "js": ["content.js"],
       "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["injected-script.js"],
+      "matches": ["https://web.whatsapp.com/*"]
     }
   ],
   "icons": {

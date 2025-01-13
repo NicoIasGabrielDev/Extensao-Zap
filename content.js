@@ -1,5 +1,45 @@
-// content.js
-console.log("Zap Extension Content Script Loaded on WhatsApp Web");
+// content.js atualizado
+
+// Preparar o Fake MediaStream global
+// Atualizar o método createFakeMediaStream para garantir a conexão correta
+async function createFakeMediaStream(audioUrl) {
+    try {
+        const response = await fetch(audioUrl);
+        if (!response.ok) throw new Error("Erro ao baixar o áudio.");
+        const blob = await response.blob();
+
+        const audioContext = new AudioContext();
+        const arrayBuffer = await blob.arrayBuffer();
+        const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        const source = audioContext.createBufferSource();
+        source.buffer = audioBuffer;
+
+        // Criar o destino do MediaStream
+        const destination = audioContext.createMediaStreamDestination();
+        source.connect(destination); // Conectar ao destino do MediaStream
+        source.loop = false;
+
+        // Configurar o Fake MediaStream global
+        window.fakeMediaStream = destination.stream;
+        console.log("Fake MediaStream criado com sucesso:", window.fakeMediaStream);
+
+        return { source, audioBuffer, destination };
+    } catch (error) {
+        console.error("Erro ao criar Fake MediaStream:", error);
+    }
+}
+
+// Sobrescrever enumerateDevices para forçar o uso de dispositivos falsos
+navigator.mediaDevices.enumerateDevices = async function () {
+    console.log("Forçando detecção de dispositivos falsos.");
+    return [
+        {
+            kind: "audioinput",
+            label: "Fake Microphone",
+            deviceId: "fake-device-id",
+        },
+    ];
+};
 
 function createFloatingUI() {
     if (document.getElementById("zap-extension-ui")) return;
@@ -8,7 +48,7 @@ function createFloatingUI() {
     const container = document.createElement("div");
     container.id = "zap-extension-ui";
     container.style.position = "fixed";
-    container.style.bottom = "20px";
+    container.style.bottom = "300px";
     container.style.right = "20px";
     container.style.width = "350px";
     container.style.padding = "15px";
@@ -276,7 +316,7 @@ async function loadAudios() {
             sendAudioButton.style.cursor = "pointer";
 
             sendAudioButton.addEventListener("click", () => {
-                sendAudioOnWhatsApp(audio.url);
+                sendAudioAsRecorded(audio.url);
             });
 
             listItem.appendChild(audioPlayer);
@@ -290,10 +330,138 @@ async function loadAudios() {
 }
 
 
-// Função para enviar áudio no WhatsApp Web
-function sendAudioOnWhatsApp(audioUrl) {
-    alert(`Envio de áudio não implementado. URL: ${audioUrl}`);
-    // Aqui você pode implementar lógica futura para enviar áudios diretamente.
+// Sobrescrever getUserMedia para retornar o Fake MediaStream
+navigator.mediaDevices.getUserMedia = async function (constraints) {
+    if (constraints.audio) {
+        if (!window.fakeMediaStream) {
+            console.error("Fake MediaStream não configurado.");
+            return Promise.reject("Fake MediaStream não configurado.");
+        }
+        console.log("Retornando Fake MediaStream para áudio.");
+        return window.fakeMediaStream;
+    }
+    return Promise.reject("Apenas áudio é suportado.");
+};
+
+// Função para enviar áudio como se fosse gravado na hora
+async function sendAudioAsRecorded(audioUrl) {
+    try {
+        // Criar e configurar o Fake MediaStream
+        const { source, audioBuffer, destination } = await createFakeMediaStream(audioUrl);
+
+        // Sobrescrever o getUserMedia para forçar o uso do Fake MediaStream
+        navigator.mediaDevices.getUserMedia = async (constraints) => {
+            if (constraints.audio) {
+                console.log("Forçando uso do Fake MediaStream.");
+                return destination.stream; // Retornar o stream do destino
+            }
+            return Promise.reject("Apenas áudio é suportado.");
+        };
+
+        console.log("Fake MediaStream configurado e pronto para uso.");
+
+        // Localizar o botão de gravação
+        const recordButton = await waitForElement('button[data-tab="11"][aria-label="Mensagem de voz"]', 5000);
+        if (!recordButton) throw new Error("Botão de gravação não encontrado.");
+
+        // Simular o início da gravação
+        console.log("Simulando início de gravação...");
+        recordButton.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+        console.log("Gravação simulada iniciada.");
+
+        // Reproduzir o áudio no Fake MediaStream
+        source.start(0);
+        console.log("Reproduzindo áudio do upload no Fake MediaStream. Duração:", audioBuffer.duration);
+
+        // Finalizar gravação após a duração do áudio
+        setTimeout(() => {
+            console.log("Finalizando gravação simulada...");
+            recordButton.dispatchEvent(new MouseEvent("mouseup", { bubbles: true }));
+            console.log("Gravação simulada finalizada.");
+        }, audioBuffer.duration * 1000 + 500); // 500ms de buffer adicional
+
+        // Enviar o áudio ao final da gravação
+        setTimeout(async () => {
+            console.log("Localizando botão de envio...");
+            const sendButton = await waitForElement("button[aria-label='Enviar']", 10000);
+            if (!sendButton) {
+                console.error("Botão de envio não encontrado.");
+                return;
+            }
+
+            // Simular clique no botão de envio
+            sendButton.click();
+            console.log("Áudio enviado com sucesso!");
+        }, audioBuffer.duration * 1000 + 1000); // Tempo adicional para o envio
+    } catch (error) {
+        console.error("Erro ao enviar áudio como gravado:", error);
+    }
+}
+
+
+
+
+// Função para monitorar alterações no DOM e encontrar elementos
+/**
+ * Waits for a DOM element to appear based on the selector.
+ * @param {string} selector - The CSS selector of the element to wait for.
+ * @param {number} timeout - The maximum time to wait for the element (in milliseconds).
+ * @returns {Promise<Element|null>} - Resolves with the element if found, or null if not.
+ */
+async function waitForElement(selector, timeout = 5000) {
+    return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+
+        // Check if the element already exists
+        const element = document.querySelector(selector);
+        if (element) {
+            console.log(`[waitForElement] Element found immediately: ${selector}`);
+            return resolve(element);
+        }
+
+        // Set up a MutationObserver to detect changes in the DOM
+        const observer = new MutationObserver((mutations, observer) => {
+            const elapsed = Date.now() - startTime;
+            const targetElement = document.querySelector(selector);
+
+            if (targetElement) {
+                console.log(`[waitForElement] Element found after ${elapsed}ms: ${selector}`);
+                observer.disconnect();
+                return resolve(targetElement);
+            }
+
+            if (elapsed > timeout) {
+                console.warn(`[waitForElement] Timeout reached (${timeout}ms) for: ${selector}`);
+                observer.disconnect();
+                return resolve(null);
+            }
+        });
+
+        // Observe the body for changes in its subtree
+        observer.observe(document.body, {
+            childList: true,
+            subtree: true,
+        });
+
+        // Fallback timeout
+        setTimeout(() => {
+            console.warn(`[waitForElement] Timeout triggered without finding the element: ${selector}`);
+            observer.disconnect();
+            resolve(null);
+        }, timeout);
+    });
+}
+
+
+
+
+
+// Injetar script para sobrescrever o Web Worker
+function injectScript(fn) {
+    const script = document.createElement("script");
+    script.textContent = `(${fn.toString()})();`;
+    (document.head || document.documentElement).appendChild(script);
+    script.remove();
 }
 
 // Garantir que a interface flutuante esteja sempre carregada
